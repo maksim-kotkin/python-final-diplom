@@ -5,6 +5,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_rest_passwordreset.tokens import get_token_generator
 
+# Состояния заказов
 STATE_CHOICES = (
     ('basket', 'Статус корзины'),
     ('new', 'Новый'),
@@ -15,6 +16,7 @@ STATE_CHOICES = (
     ('canceled', 'Отменен'),
 )
 
+# Типы пользователей
 USER_TYPE_CHOICES = (
     ('shop', 'Магазин'),
     ('buyer', 'Покупатель'),
@@ -22,18 +24,13 @@ USER_TYPE_CHOICES = (
 )
 
 
-# Create your models here.
-
-
+# Миксин для управления пользователями
 class UserManager(BaseUserManager):
-    """
-    Миксин для управления пользователями
-    """
     use_in_migrations = True
 
     def _create_user(self, email, password, **extra_fields):
         """
-        Create and save a user with the given username, email, and password.
+        Создание и сохранение пользователя с указанными email и паролем
         """
         if not email:
             raise ValueError('The given email must be set')
@@ -44,11 +41,17 @@ class UserManager(BaseUserManager):
         return user
 
     def create_user(self, email, password=None, **extra_fields):
+        """
+        Создание обычного пользователя
+        """
         extra_fields.setdefault('is_staff', False)
         extra_fields.setdefault('is_superuser', False)
         return self._create_user(email, password, **extra_fields)
 
     def create_superuser(self, email, password, **extra_fields):
+        """
+        Создание суперпользователя
+        """
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
         extra_fields.setdefault('is_active', True)
@@ -61,10 +64,8 @@ class UserManager(BaseUserManager):
         return self._create_user(email, password, **extra_fields)
 
 
+# Стандартная модель пользователей
 class User(AbstractUser):
-    """
-    Стандартная модель пользователей
-    """
     REQUIRED_FIELDS = []
     objects = UserManager()
     USERNAME_FIELD = 'email'
@@ -100,16 +101,17 @@ class User(AbstractUser):
         ordering = ('email',)
 
 
+# Модель магазинов
 class Shop(models.Model):
     objects = models.manager.Manager()
     name = models.CharField(max_length=50, verbose_name='Название')
     url = models.URLField(verbose_name='Ссылка', null=True, blank=True)
+    import_url = models.URLField(verbose_name='URL для импорта товаров', null=True, blank=True)
     user = models.OneToOneField(User, verbose_name='Пользователь',
                                 blank=True, null=True,
                                 on_delete=models.CASCADE)
     state = models.BooleanField(verbose_name='статус получения заказов', default=True)
 
-    # filename
 
     class Meta:
         verbose_name = 'Магазин'
@@ -120,6 +122,7 @@ class Shop(models.Model):
         return self.name
 
 
+# Модель категорий
 class Category(models.Model):
     objects = models.manager.Manager()
     name = models.CharField(max_length=40, verbose_name='Название')
@@ -134,6 +137,7 @@ class Category(models.Model):
         return self.name
 
 
+# Модель продуктов
 class Product(models.Model):
     objects = models.manager.Manager()
     name = models.CharField(max_length=80, verbose_name='Название')
@@ -149,6 +153,7 @@ class Product(models.Model):
         return self.name
 
 
+# Модель информации о продуктах
 class ProductInfo(models.Model):
     objects = models.manager.Manager()
     model = models.CharField(max_length=80, verbose_name='Модель', blank=True)
@@ -164,14 +169,17 @@ class ProductInfo(models.Model):
     class Meta:
         verbose_name = 'Информация о продукте'
         verbose_name_plural = "Информационный список о продуктах"
+        ordering = ('product',)
         constraints = [
             models.UniqueConstraint(fields=['product', 'shop', 'external_id'], name='unique_product_info'),
         ]
 
 
+# Модель параметров
 class Parameter(models.Model):
+
     objects = models.manager.Manager()
-    name = models.CharField(max_length=40, verbose_name='Название')
+    name = models.CharField(max_length=40,  unique=True, verbose_name='Название')
 
     class Meta:
         verbose_name = 'Имя параметра'
@@ -182,6 +190,7 @@ class Parameter(models.Model):
         return self.name
 
 
+# Модель, связывающая параметры и информацию о продуктах
 class ProductParameter(models.Model):
     objects = models.manager.Manager()
     product_info = models.ForeignKey(ProductInfo, verbose_name='Информация о продукте',
@@ -199,6 +208,7 @@ class ProductParameter(models.Model):
         ]
 
 
+# Модель, содержащая адрес и контактную информацию пользователя 
 class Contact(models.Model):
     objects = models.manager.Manager()
     user = models.ForeignKey(User, verbose_name='Пользователь',
@@ -221,12 +231,14 @@ class Contact(models.Model):
         return f'{self.city} {self.street} {self.house}'
 
 
+# Модель заказов
 class Order(models.Model):
     objects = models.manager.Manager()
     user = models.ForeignKey(User, verbose_name='Пользователь',
                              related_name='orders', blank=True,
                              on_delete=models.CASCADE)
-    dt = models.DateTimeField(auto_now_add=True)
+    dt = models.DateTimeField(auto_now_add=True, verbose_name='Время создания заказа')
+    updated_dt = models.DateTimeField(auto_now=True, verbose_name='Время последнего обновления заказа')
     state = models.CharField(verbose_name='Статус', choices=STATE_CHOICES, max_length=15)
     contact = models.ForeignKey(Contact, verbose_name='Контакт',
                                 blank=True, null=True,
@@ -234,17 +246,14 @@ class Order(models.Model):
 
     class Meta:
         verbose_name = 'Заказ'
-        verbose_name_plural = "Список заказ"
-        ordering = ('-dt',)
+        verbose_name_plural = "Список заказов"
+        ordering = ('-dt', 'updated_dt')
 
     def __str__(self):
         return str(self.dt)
 
-    # @property
-    # def sum(self):
-    #     return self.ordered_items.aggregate(total=Sum("quantity"))["total"]
 
-
+# Модель заказанных позиций
 class OrderItem(models.Model):
     objects = models.manager.Manager()
     order = models.ForeignKey(Order, verbose_name='Заказ', related_name='ordered_items', blank=True,
@@ -263,6 +272,7 @@ class OrderItem(models.Model):
         ]
 
 
+# Модель токена подтверждения Email
 class ConfirmEmailToken(models.Model):
     objects = models.manager.Manager()
     class Meta:
@@ -271,7 +281,6 @@ class ConfirmEmailToken(models.Model):
 
     @staticmethod
     def generate_key():
-        """ generates a pseudo random code using os.urandom and binascii.hexlify """
         return get_token_generator().generate_token()
 
     user = models.ForeignKey(
@@ -286,7 +295,6 @@ class ConfirmEmailToken(models.Model):
         verbose_name=_("When was this token generated")
     )
 
-    # Key field, though it is not the primary key of the model
     key = models.CharField(
         _("Key"),
         max_length=64,
