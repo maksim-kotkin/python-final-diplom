@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from ujson import loads as load_json
 
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from backend.models import Shop, Category, ProductInfo, Parameter, ProductParameter, Order, OrderItem, \
     Contact, ConfirmEmailToken
 from backend.serializers import UserSerializer, CategorySerializer, ShopSerializer, ProductInfoSerializer, \
@@ -21,7 +22,10 @@ from backend.serializers import UserSerializer, CategorySerializer, ShopSerializ
 from backend.tasks import do_import
 from backend.signals import new_user_registered, new_order
 
-
+class TestErrorView(APIView):
+    def get(self, request):
+        raise ValueError("Test exception for Sentry!")
+    
 # Класс для регистрации нового пользователя
 class RegisterAccount(APIView):
 
@@ -143,7 +147,7 @@ class CategoryView(ListAPIView):
 
 # Класс для просмотра списка магазинов
 class ShopView(ListAPIView):
-
+    throttle_classes = [AnonRateThrottle, UserRateThrottle]
     queryset = Shop.objects.filter(state=True)
     serializer_class = ShopSerializer
 
@@ -295,7 +299,7 @@ class PartnerUpdate(APIView):
 
 # Класс для управления статуса партнера
 class PartnerState(APIView):
-
+    
     # Получение текущего статуса методом GET
     def get(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -350,7 +354,6 @@ class PartnerOrders(APIView):
 
 # Класс для управления контактной информацией
 class ContactView(APIView):
-
     # Получение контактной информаци методом GET
     def get(self, request, *args, **kwargs):
         if not request.user.is_authenticated:

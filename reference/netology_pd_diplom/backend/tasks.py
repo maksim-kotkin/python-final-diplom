@@ -7,10 +7,17 @@ from netology_pd_diplom.celery import app
 from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
 from django.db import IntegrityError
+from easy_thumbnails.files import generate_all_aliases
 
 from backend.models import Shop, Category, Product, Parameter, ProductParameter, ProductInfo
 
 
+@app.task
+def generate_thumbnails(model, pk, field):
+    instance = model._default_manager.get(pk=pk)
+    fieldfile = getattr(instance, field)
+    generate_all_aliases(fieldfile, include_global=True)
+    
 # Отправка email-сообщения с помощью EmailMultiAlternatives.
 @app.task()
 def send_email(title, message, email):

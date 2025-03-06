@@ -4,6 +4,16 @@ from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_rest_passwordreset.tokens import get_token_generator
+from django.dispatch import receiver
+from easy_thumbnails.signals import saved_file
+from asyncio import tasks
+
+
+@receiver(saved_file)
+def generate_thumbnails_async(sender, fieldfile, **kwargs):
+    tasks.generate_thumbnails.delay(
+        model=sender, pk=fieldfile.instance.pk,
+        field=fieldfile.field.name)
 
 # Состояния заказов
 STATE_CHOICES = (

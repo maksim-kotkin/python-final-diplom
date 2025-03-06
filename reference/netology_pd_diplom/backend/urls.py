@@ -4,7 +4,7 @@ from django_rest_passwordreset.views import reset_password_request_token, reset_
 
 from backend.views import PartnerUpdate, RegisterAccount, LoginAccount, CategoryView, ShopView, ProductInfoView, \
     BasketView, \
-    AccountDetails, ContactView, OrderView, PartnerState, PartnerOrders, ConfirmAccount
+    AccountDetails, ContactView, OrderView, PartnerState, PartnerOrders, ConfirmAccount, TestErrorView
 
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
@@ -29,6 +29,7 @@ schema_view = get_schema_view(
 
 app_name = 'backend'
 urlpatterns = [
+    path('sentry-debug/', TestErrorView.as_view(), name='test-error'),
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('partner/update', PartnerUpdate.as_view(), name='partner-update'),
     path('partner/state', PartnerState.as_view(), name='partner-state'),

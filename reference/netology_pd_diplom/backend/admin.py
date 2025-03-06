@@ -42,7 +42,7 @@ class ShopAdmin(admin.ModelAdmin):
         for shop in queryset:
             import_url = shop.import_url
 
-            if import_url:git
+            if import_url:
                 try:
                     validate_url(import_url) 
                     do_import.delay(shop.user.id, import_url)  
